@@ -1,0 +1,309 @@
+%% This is LaTeX template for preparing papers for Publ. Inst. Math.; version of 12.12.2013
+%% Please delete everything begining with %% (DOUBLE %).
+
+% Submission number: please insert
+\documentclass[a4paper,draft]{amsproc}
+\usepackage{amssymb}
+\usepackage{amscd} %% Package for commutative diagrams
+%\usepackage[dvips]{graphicx} %% Package for inserting illustrations/figures
+
+%% The following packages are useful (you may want to use them):
+%\usepackage{refcheck} %% Checks whether enumerated equations are referred to or not.
+                       %% Please remove unnecessary numbers.
+%\usepackage{cmdtrack} %% Checks whether all author defined macros are used or not
+                       %% (see the end of .log file); unused ones should be removed.
+%% Both of the packages have some limitations---consult package documentations.
+
+\theoremstyle{plain}
+ \newtheorem{thm}{Theorem}[section]
+ \newtheorem{prop}{Proposition}[section]
+ \newtheorem{lem}{Lemma}[section]
+ \newtheorem{cor}{Corollary}[section]
+\theoremstyle{definition}
+ \newtheorem{exm}{Example}[section]
+ \newtheorem{dfn}{Definition}[section]
+\theoremstyle{remark}
+ \newtheorem{rem}{Remark}[section]
+ \numberwithin{equation}{section}
+
+%% Please, do not change the following four lines:
+\renewcommand{\le}{\leqslant}\renewcommand{\leq}{\leqslant}
+\renewcommand{\ge}{\geqslant}\renewcommand{\geq}{\geqslant}
+\renewcommand{\setminus}{\smallsetminus}
+\setlength{\textwidth}{28cc} \setlength{\textheight}{42cc}
+
+\begin{document}
+
+\vspace{18mm} \setcounter{page}{1} \thispagestyle{empty}
+
+\title{An Analysis of Error Estimates in Numerical Integration}
+\author[An Analysis of Error Estimates in Numerical Integration]{Megan Chen}
+\maketitle
+
+\section{Introduction}
+
+\emph{Numerical integration}, also known as \emph{quadratures}, is the process of approximating definite integrals as close as possible to their exact values. It is most commonly used when we have an integrand function whose antiderivative cannot be computed using standard integration techniques for elementary functions, or when we only know the value of the integrand function at specific discrete points within a given interval. Throughout this semester in 21-660 Numerical Analysis, and in Chapter 9 of Rainer Kress's \emph{Numerical Analysis} text, we have investigated various quadrature formulae for approximating definite integrals, such as the Newton-Cotes interpolatory quadrature formulae (most notably, the Trapezoidal Rule and Simpson's Rule), the Gaussian quadrature formulae (such as Gauss-Chebyshev and Gauss-Legendre quadratures), and the rectangular rule (for periodic functions). Each method of numerical integration has its own unique approach, and thus its own degree of accuracy/error estimates. But when do we know which method is best for approximating certain integrals, and why?
+
+In this paper, we will investigate some of the aforementioned quadrature formulae's degrees of accuracy in estimating integrals by evaluating several test cases of definite integrals using each of the quadrature formulae, and calculating their resulting errors of estimation. (NOTE: The Python code used to generate the numerical integration results can be found in the last section of this paper -- aka the \verb+project.py+ file) We will then compare the errors produced by each of the formulae, and interpret the results--what they produced, and why they appeared the way they did.
+
+In order to incorporate different types of test integrals to approximate (i.e., periodic, polynomial, trigonometric, radical, etc.), we will estimate the following integrals throughout this paper:
+\[
+(1). \displaystyle\int_{0}^{2\pi}\frac{1}{5-4\cos{x}}dx=\frac{2\pi}{3}
+\]
+\[
+(2). \displaystyle\int_{-1}^{1}\frac{1}{\sqrt{1-x^2}}dx=\pi
+\]
+\[
+(3). \displaystyle\int_{0}^{2\pi}x\sin{x}\cos{x}dx=-\frac{\pi}{2}
+\]
+\[
+(4). \displaystyle\int_{-1}^{1}(x^2-2x+3)dx=\frac{20}{3}
+\]
+\[
+(5). \displaystyle\int_{-1}^{1}\frac{x}{\sqrt{1-x^2}}dx=0
+\]
+
+\section{Interpolatory Quadratures: The Newton-Cotes Formulae}
+Recall from section 9.1 of Kress's text that a definite integral of the form
+\[
+Q(f)=\displaystyle\int_{a}^{b}f(x)dx
+\]
+where $f$ is a continuous function over the interval $[a, b]$ with $a<b$ can be approximated by a weighted sum
+\[
+Q_n(f)=\displaystyle\sum_{k=0}^{n}a_kf(x_k)
+\]
+with $n+1$ distinct \emph{quadrature points} $x_0, \cdots, x_n\in [a, b]$ and \emph{quadrature weights} $a_0, \cdots, a_n\in\mathbb{R}$.
+
+One way that we can approximate definite integrals is via integrating a Lagrange interpolating polynomial instead of the original integrand itself. In other words, we can approximate
+\[
+\displaystyle\int_{a}^{b}f(x)dx\approx\int_{a}^{b}(L_nf)(x)dx
+\]
+where $L_n: C[a, b]\rightarrow P_n$ is the Lagrange polynomial interpolation operator with interpolation points $x_0, \cdots, x_n$. 
+
+These Lagrange interpolation quadrature formulae are also known as the \emph{Newton Cotes} rules. They are defined as follows, as quoted by Theorem 9.3 in section 9.1 in Kress's text:
+
+\begin{thm}
+The polynomial interpolatory quadrature of order $n$ with equidistant quadrature points
+\[
+x_k=a+kh, k=0, \cdots, n,
+\]
+and step width $h=(b-a)/n$ is called the \emph{Newton-Cotes quadrature formula} of order $n$. Its weights are given by
+\[
+a_k=h\displaystyle\frac{(-1)^{n-k}}{k!(n-k)!}\int_{0}^{n}\prod_{j=0 \\ j\neq k}^{n}(z-j)dz, k=0, \cdots, n,
+\]
+and have the symmetry property $a_k=a_{n-k}$, $k=0, \cdots, n$.
+\end{thm}
+
+For simplicity's sake, we will look closely at the first two Newton-Cotes rules, namely the \emph{Trapezoidal Rule} (when $n=1$) and \emph{Simpson's Rule} (when $n=2$), and approximate each of our test integrals with these formulae.
+
+\subsection{Trapezoidal Rule}
+
+When we look at the Newton-Cotes quadrature formula of order $n=1$, we get the Trapezoidal Rule. Evaluating its Newton-Cotes quadrature weights gives us $a_0=a_1=1$, so for a general interval $[a, b]$, the Trapezoidal Rule approximates a definite integral of $f$ over $[a, b]$ as follows:
+\[
+\displaystyle\int_{a}^{b}f(x)dx\approx\frac{b-a}{2}[f(a)+f(b)]=\frac{h}{2}[f(x_0)+f(x_1)]
+\]
+where $x_0=a$ and $x_1=b$.
+
+From a geometric point of view, the Trapezoidal Rule approximation estimates the definite integral of $f$ on $[a, b]$ by finding the area under the region formed by the vertices $(a, f(a))$, $(b, f(b))$, $(a, 0)$, and $(b, 0)$. This region is a trapezoid with altitude $h=b-a$ and base lengths $f(a)=f(x_0)$ and $f(b)=f(x_1)$.
+
+But what if we want to increase the level of accuracy that Trapezoidal Rule approximations give for our integrals? In this case, it would be more ideal to apply the \emph{composite Trapezoidal Rule}, where we subdivide $[a, b]$, the interval of integration, into more than one subinterval. If we do this with an equidistant subdivision $x_k=a+kh$, $k=0, \cdots, n$, where our step size is $h=(b-a)/n$, the composite trapezoidal rule will approximate $\displaystyle\int_{a}^{b}f(x)dx$ by
+\[
+T_h(f)=h\left[\displaystyle\frac{1}{2}f(x_0)+f(x_1)+\cdots+f(x_{n-1})+\frac{1}{2}f(x_n)\right]
+\]
+This results in an error given by
+\[
+\displaystyle\int_{a}^{b}f(x)dx-T_h(f)=-\frac{b-a}{12}h^2f''(\zeta)
+\]
+for some $\zeta\in [a, b]$.
+
+Approximating all of our (valid) test integrals with the (composite) Trapezoidal Rule, we get the following:
+
+\begin{displaymath}
+\begin{array}{|c|c|c|c|c|c|c}
+
+ & n=4
+ & \text{Error}
+ & n=8
+ & \text{Error}
+ & n=12
+ & \text{Error} \\
+\hline
+(1) & 2.373648 & 0.279253 & 2.110822 & 0.016427 & 2.095418 & 0.001023 \\
+(3) & -3.021695*10^{-16} & 1.570796 & -1.233701 & 0.337096 & -1.424555 & 0.146242 \\
+(4) & 6.75 & 0.083333 & 6.6875 & 0.020833 & 6.675926 & 0.009259 \\
+\hline
+\end{array}
+\end{displaymath}
+
+\subsection{Simpson's Rule}
+
+Setting order $n=2$ for the Newton-Cotes quadrature gives us Simpson's Rule. Evaluating its Newton-Cotes quadrature weights gives us $a_0=a_2=1/3$ and $a_1=4/3$. Hence for a general interval $[a, b]$, Simpson's Rule approximates a definite integral of $f$ over $[a, b]$ as follows:
+\[
+\displaystyle\int_{a}^{b}f(x)dx\approx\frac{b-a}{6}\left[f(a)+4f\left(\frac{a+b}{2}\right)+f(b)\right]=\frac{h}{3}[f(x_0)+4f(x_1)+f(x_2)]
+\]
+where $x_0=a$, $x_1=\displaystyle\frac{a+b}{2}$, and $x_2=b$.
+
+From a geometric point of view, Simpson's Rule estimates the definite integral of $f$ on $[a, b]$ by finding the integral of the parabola formed by connecting the points $(a, f(a))$, $\left(\displaystyle\frac{a+b}{2}, f\left(\frac{a+b}{2}\right)\right)$, and $(b, f(b))$.
+
+As we did for the Trapezoidal Rule, we can also increase the number of subdivisions we make along the interval of integration $[a, b]$ to perform a Simpson's Rule approximation, thereby giving us the \emph{composite Simpson's Rule}. If we do this with an equidistant subdivision $x_k=a+kh$, $k=0, \cdots, n$, where $n$ is even and our step size is $h=(b-a)/n$, the composite Simpson's Rule will approximate $\displaystyle\int_{a}^{b}f(x)dx$ by
+\[
+S_h(f)=\displaystyle\frac{h}{3}[f(x_0)+4f(x_1)+2f(x_2)+4f(x_3)+\cdots+2f(x_{n-2})+4f(x_{n-1})+f(x_n)]
+\]
+This results in an error given by
+\[
+\displaystyle\int_{a}^{b}f(x)dx-S_h(f)=-\frac{b-a}{180}h^4f^{(4)}(\zeta)
+\]
+for some $\zeta\in [a, b]$.
+
+Approximating all of our (valid) test integrals with the (composite) Simpson's Rule, we get the following:
+
+\begin{displaymath}
+\begin{array}{|c|c|c|c|c|c|c}
+
+ & n=4
+ & \text{Error}
+ & n=8
+ & \text{Error}
+ & n=12
+ & \text{Error} \\
+\hline
+(1) & 2.001311 & 0.093084 & 2.023213 & 0.071182 & 2.073596 & 0.020799 \\
+(3) & 1.611571*10^{-15} & 1.570796 & -1.644934 & 0.074138 & -1.582839 & 0.012042 \\
+(4) & 6.666667 & 8.881784*10^{-16} & \leftarrow & Same & as & n=4 \\
+\hline
+\end{array}
+\end{displaymath}
+
+\section{Gaussian Quadratures}
+
+\emph{Gaussian quadratures} are unique quadrature methods in the sense that, unlike Newton-Cotes formulae, they aim to choose optimal values for $x_k$ rather than uniformly equidistant values. These optimal quadrature points are selected such that polynomials in $P_{2n+1}$ are integrated exactly. In other words, by Definition 9.12 in Kress's text, a quadrature formula
+\[
+\displaystyle\int_{a}^{b}w(x)f(x)dx\approx\sum_{k=0}^{n}a_kf(x_k)
+\]
+with $n+1$ distinct quadrature points $x_0, \cdots, x_n$ is called a \emph{Gaussian quadrature formula} if $\displaystyle\sum_{k=0}^{n}a_kp(x_k)=\int_{a}^{b}w(x)p(x)dx$ for all polynomials $p\in P_{2n+1}$.
+
+In a Gaussian quadrature formula, $w: (a, b)\rightarrow\mathbb{R}$ denotes a \emph{weight function} that is continuous and positive, and such that $\displaystyle\int_{a}^{b}w(x)dx$ exists. Some of the most common weight functions used in Gaussian quadratures include $w(x)=\displaystyle\frac{1}{\sqrt{1-x^2}}$ (\emph{Gauss-Chebyshev quadrature}) and $w(x)=1$ (\emph{Gauss-Legendre quadrature}). We will investigate the degrees of accuracy for each of these Gaussian quadrature formulae.
+
+\subsection{Gauss-Chebyshev Quadrature}
+
+As in Example 9.21 of Kress's text, consider the Gaussian quadrature formulae for the weight function $w(x)=\displaystyle\frac{1}{\sqrt{1-x^2}}$, where $-1\leq x\leq 1$. In this case, the zeroes (and hence quadrature points) of the Chebyshev polynomials $T_n$ of degree $n$, defined by $T_n(x)=\cos{(n\arccos{x})}$ (where $-1\leq x\leq 1$), are
+\[
+x_k=\cos{\left(\displaystyle\frac{2k+1}{2n}\pi\right)}, k=0, \cdots, n-1
+\]
+and the quadrature weights are
+\[
+a_k=\displaystyle\frac{\pi}{n}, k=0, \cdots, n-1.
+\]
+Hence, this yields the Gauss-Chebyshev quadrature formula of order $n-1$ as
+\[
+\displaystyle\int_{-1}^{1}\frac{f(x)}{\sqrt{1-x^2}}dx\approx\frac{\pi}{n}\sum_{k=0}^{n-1}f\left(\cos{\frac{2k+1}{2n}\pi}\right)
+\]
+and this results in an error given by
+\[
+\displaystyle\int_{-1}^{1}\frac{f(x)}{\sqrt{1-x^2}}dx-\frac{\pi}{n}\sum_{k=0}^{n-1}f\left(\cos{\frac{2k+1}{2n}\pi}\right)=\frac{\pi f^{(2n)}(\zeta)}{2^{2n-1}(2n)!}
+\]
+for some $\zeta\in [-1, 1]$.
+
+Approximating all of our (valid) test integrals with the Gauss-Chebyshev quadrature, we get the following:
+
+\begin{displaymath}
+\begin{array}{|c|c|c|c|c|c|c}
+
+ & n=5
+ & \text{Error}
+ & n=10
+ & \text{Error}
+ & n=15
+ & \text{Error} \\
+\hline
+(2) & \pi & 0 & \pi & 0 & \pi & 0 \\
+(5) & 0 & 0 & 0 & 0 & 0 & 0 \\
+\hline
+\end{array}
+\end{displaymath}
+
+\subsection{Gauss-Legendre Quadrature}
+
+As in Example 9.22 of Kress's text, consider the Gaussian quadrature formulae for the weight function $w(x)=1$, where $-1\leq x\leq 1$. In this case, unlike the case with the Gauss-Chebyshev quadrature, the zeroes (and hence quadrature points) of the Legendre polynomials $L_n$ of degree $n$, defined by $L_n(x)=\displaystyle\frac{1}{2^nn!}\frac{d^n}{dx^n}(x^2-1)^n$, cannot be explicitly expressed by a single expression. For sake of simplicity, let's inspect the cases where $n=1$ and $n=2$. These cases yield the Gauss-Legendre quadratures 
+\[
+\displaystyle\int_{-1}^{1}f(x)dx\approx 2f(0)
+\]
+and
+\[
+\displaystyle\int_{-1}^{1}f(x)dx\approx f\left(-\frac{1}{\sqrt{3}}\right)+f\left(\frac{1}{\sqrt{3}}\right)
+\]
+respectively. Their resulting errors are
+\[
+\displaystyle\int_{-1}^{1}f(x)dx-2f(0)=\frac{1}{3}f''(\zeta)
+\]
+and
+\[
+\displaystyle\int_{-1}^{1}f(x)dx-f\left(-\frac{1}{\sqrt{3}}\right)-f\left(\frac{1}{\sqrt{3}}\right)=\frac{1}{135}f^{(4)}(\zeta)
+\]
+respectively, for some $\zeta\in [-1, 1]$.
+
+Approximating all of our (valid) test integrals with the first two Gauss-Legendre quadrature formulae, we get the following:
+
+\begin{displaymath}
+\begin{array}{|c|c|c|c|c|c|c}
+
+ & \text{1st}
+ & \text{Error}
+ & \text{2nd}
+ & \text{Error} \\
+\hline
+(2) & 2 & 1.141593 & 2.449490 & 0.692103 \\
+(4) & 6 & 0.666667 & 6.666667 & 0 \\
+(5) & 0 & 0 & 0 & 0 \\
+\hline
+\end{array}
+\end{displaymath}
+
+\section{Quadrature of Periodic Functions: The Rectangular Rule}
+
+When working with $2\pi$-periodic continuous functions $f: \mathbb{R}\rightarrow\mathbb{R}$, we can also use the \emph{rectangular rule}, which is analogous to the Trapezoidal Rule, to approximate integrals with $2\pi$-periodic integrands and $[0, 2\pi]$ as an integration interval. This rectangular rule approximation is given by (according to section 9.4 of Kress)
+\[
+\displaystyle\int_{0}^{2\pi}f(x)dx\approx\frac{2\pi}{n}\sum_{k=1}^{n}f\left(\frac{2\pi k}{n}\right)
+\]
+Approximating all of our (valid) test integrals with the rectangular rule for $2\pi$-periodic functions, we get the following:
+
+\begin{displaymath}
+\begin{array}{|c|c|c|c|c|c|c}
+
+ & n=4
+ & \text{Error}
+ & n=8
+ & \text{Error}
+ & n=12
+ & \text{Error} \\
+\hline
+(1) & 2.373648 & 0.279253 & 2.110822 & 0.016427 & 2.095418 & 0.001023 \\
+(3) & -1.510847*10^{-15} & 1.570796 & -1.233701 & 0.337096 & -1.424555 & 0.146242 \\
+\hline
+\end{array}
+\end{displaymath}
+
+\section{Summary and Conclusion}
+
+In general, we can see, from calculating sample approximations via all the numerical integration methods we analyzed, that no method seems to be perfect for every type of integrand function (periodic, polynomial,  factoring in a Gaussian quadrature weight function, etc). There were various cases where we would favor one method over another, but others where it's vice versa. Most of this all depends on what type of function is being involved in the integrand.
+
+For example, consider the integral marked by (1). One can notice that as opposed to the rest of the integrals where Simpson's Rule seemingly gives a more accurate approximation due to its higher order amongst the Newton-Cotes quadrature formulae (a.k.a. with a smaller error value), and the fact that it does parabolic curve fitting as opposed to linear fitting, integral (1) (which is also Problem 9.12 in Kress's text) is less accurate with Simpson's Rule. Instead, the Trapezoidal Rule and rectangular rule for $2\pi$ periodic functions both provide a better estimate of the value of (1) than Simpson's Rule does. Note that one can easily check with some simple algebra (and using $h=(b-a)/n=2\pi/n$) that the rectangular rule for $2\pi$ periodic functions is equivalent to the trapezoidal rule (and note that the estimation and error results for both the Trapezoidal and rectangular rules came out to be the same for integrals (1) and (3), the two $2\pi$ periodic integrals evaluated over $[0, 2\pi]$). 
+
+Another thing to notice is that the Gaussian quadrature formulas have some pretty unusual situations where they estimate some integrals with 100 percent accuracy, and others where their estimations are fairly inaccurate relative to those by the Newton-Cotes formulae. Recall, by definition of the Gaussian quadrature, that it aims to optimize the values of the $n$ quadrature points $x_k$ and quadrature weights $a_k$ in such a manner that whenever an integral $\displaystyle\int_{-1}^{1}w(x)f(x)dx$ is being approximated, $f$ is a polynomial whose degree is no larger than $2n+1$. This explains why in integrals (2) and (5), the estimations given by the Gauss-Chebyshev quadrature formula (and some of the approximations from the Gauss-Legendre methods) were completely exact, with error 0. Otherwise, when we don't have a polynomial for $f$ when integrating $w(x)f(x)$, such as in integral (2) when doing Gauss-Legendre, the approximation can turn out quite inaccurate compared to the approximations obtained from the Newton-Cotes rules.
+
+So in summary, each of the numerical integration methods we saw in Chapter 9 of Kress's textbook has its own strengths and weaknesses with approximating different kinds of integrals, and it's important that we carefully consider the nature of the integral, such as the type of function its integrand is, and the interval of integration, before deciding which quadrature rule would be best to use for approximating the integral with minimal error.
+
+\bibliographystyle{amsplain}
+\begin{thebibliography}{n} %% n is number of items, or the largest label
+
+\bibitem{1} R. Kress, \emph{Numerical Analysis}, Springer-Verlag, 1998, New York, 190-224.
+
+\bibitem{2} D. Kuonen, \emph{Numerical Integration in S-PLUS or R: A Survey}, in: Journal of Statistical Software (Vol. 8, Issue 13), 2003.
+
+\bibitem{3} A. Sidi, \emph{Comparison of Some Numerical Quadrature Formulas for Weakly Singular Periodic Fredholm Integral Equations}, in: Computing (43), Springer-Verlag, 1989, 159-170.
+
+\end{thebibliography}
+
+\end{document}
+
+
